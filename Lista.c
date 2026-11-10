@@ -16,6 +16,116 @@ struct Lista { //cria a struct lista
     int sinal;  //vamos assumir o valor 1 para positivo ou zero e -1 para negativo
 };
 
+// compara os módulos, sem considerar os sinais
+// recebe listas válidas e sem zeros excedentes no final
+static int comparar_modulos(const Lista *a, const Lista *b) {
+    
+    const No *pa = a->head;
+    const No *pb = b->head;
+
+    int resultado = 0;
+
+    while (pa != NULL && pb != NULL) {
+        // uma diferença em um bloco mais significativo
+        // substitui a diferença encontrada anteriormente
+        if (pa->bloco > pb->bloco) {
+            resultado = 1;
+        } else if (pa->bloco < pb->bloco) {
+            resultado = -1;
+        }
+
+        pa = pa->proximo;
+        pb = pb->proximo;
+    }
+
+    // se a ainda tem blocos, seu módulo é maior
+    if (pa != NULL)
+        return 1;
+
+    // se b ainda tem blocos, seu módulo é maior
+    if (pb != NULL)
+        return -1;
+
+    return resultado;
+}
+
+
+// adiciona um bloco ao final da lista
+// retorna 1 se conseguiu ou 0 se houve falha
+static int adicionar_bloco(Lista *lista, No **ultimo, int bloco) {
+    if (lista == NULL || ultimo == NULL) //verifica a alocação
+        return 0;
+
+    if (bloco < 0 || bloco > 9999) //verifica se o bloco está dentro dos limites
+        return 0;
+
+    // se a lista não está vazia, precisamos do último nó
+    if (lista->head != NULL && *ultimo == NULL){
+        return 0;
+
+    }
+
+    No *novo = malloc(sizeof(No));
+
+    if (novo == NULL) //verifica se o novo nó criado alocou
+        return 0;
+
+    novo->bloco = bloco; //o valor do bloco vira o valor do bloco do novo
+    novo->proximo = NULL; //como é o ultimo, aponta pra nulo
+
+    if (lista->head == NULL) {
+        // o novo nó será o primeiro da lista
+        lista->head = novo;
+    } else {
+        // conecta o último nó existente ao novo
+        (*ultimo)->proximo = novo;
+    }
+
+    // atualiza o ponteiro ultimo da função que chamou
+    *ultimo = novo;
+
+    return 1;
+}
+
+
+// remove zeros excedentes na parte mais significativa
+// mantém um único nó com valor 0 quando o resultado é zero
+static void normalizar(Lista *lista) {
+    if (lista == NULL || lista->head == NULL)
+        return; //verifica se está alocado
+
+    No *atual = lista->head; //primeiro da lista
+    No *ultimo_nao_zero = NULL; 
+
+    // encontra o último nó cujo bloco não é zero
+    while (atual != NULL) {
+        if (atual->bloco != 0)
+            ultimo_nao_zero = atual;
+
+        atual = atual->proximo; //avançando
+    }
+
+    if (ultimo_nao_zero == NULL) {
+        // todos os blocos são zero: mantém apenas o primeiro
+        atual = lista->head->proximo;
+        lista->head->proximo = NULL;
+
+        // zero sempre fica com sinal positivo
+        lista->sinal = 1;
+    } else {
+        // separa os nós que vêm depois do último bloco não zero
+        atual = ultimo_nao_zero->proximo;
+        ultimo_nao_zero->proximo = NULL;
+    }
+
+    // libera os nós excedentes
+    while (atual != NULL) {
+        No *proximo = atual->proximo;
+        free(atual);
+        atual = proximo;
+    }
+}
+
 // le um número da entrada e devolve sua representação em lista
 Lista *lista_ler(void) {
     // ler o numero como um texto
@@ -343,12 +453,14 @@ void lista_imprimir(const Lista *lista) {
 
             return;
         }
+        
+        //cria como se fosse uma lista encadeada, so que começando pelo final
+        //se o novo não for nulo
+        novo->bloco = atual->bloco; //copia o valor do bloco atual
+        novo->proximo = invertida; //o próximo se torna a invertida;
+        invertida = novo; // e a invertida se torna o novo
 
-        novo->bloco = atual->bloco;
-        novo->proximo = invertida;
-        invertida = novo;
-
-        atual = atual->proximo;
+        atual = atual->proximo; //a atual se torna atual->proximo
     }
 
     // identifica o zero para nunca imprimir -0
@@ -358,6 +470,7 @@ void lista_imprimir(const Lista *lista) {
     if (lista->sinal == -1 && !eh_zero)
         printf("-");
 
+    //invertida está na primeira posição do nó ja arrumado para a impressão
     No *aux = invertida;
 
     // imprime o bloco mais significativo sem zeros de preenchimento
@@ -378,6 +491,133 @@ void lista_imprimir(const Lista *lista) {
     }
 }
 
-Lista *lista_somar(const Lista *a, const Lista *b){
-    //aa
+// soma dois números e retorna uma nova lista
+// as listas a e b não são modificadas
+Lista *lista_somar(const Lista *a, const Lista *b) {
+
+    if (a == NULL || b == NULL){
+        return NULL;   // verifica os ponteiros antes de acessar seus campos
+    }
+
+    // nesta implementação, todo número deve ter pelo menos um nó
+    if (a->head == NULL || b->head == NULL)
+        return NULL;
+
+    if ((a->sinal != 1 && a->sinal != -1) || (b->sinal != 1 && b->sinal != -1)){// verifica se os sinais são válidos
+        return NULL;
+    }
+
+    // cria a lista que vai guardar o resultado
+    Lista *resultado = malloc(sizeof(Lista));
+
+    if (resultado == NULL){ //verifica a alocação
+        return NULL;
+    }
+
+    resultado->head = NULL; //lista está vazia
+    resultado->sinal = 1; //sinal positivo
+
+    // acompanha o último nó para inserir os próximos no final
+    No *ultimo = NULL;
+
+    if (a->sinal == b->sinal) {
+        // sinais iguais: soma os módulos e mantém o sinal
+        // exemplo: -10 + (-3) = -13
+        resultado->sinal = a->sinal;
+
+        const No *pa = a->head;
+        const No *pb = b->head;
+
+        int vai_um = 0;
+
+        // continua enquanto houver blocos ou um valor para transportar
+        while (pa != NULL || pb != NULL || vai_um != 0) {
+
+            // começa com o transporte da soma anterior
+            int soma = vai_um;
+
+            // adiciona o bloco de a, se ainda existir
+            if (pa != NULL) {
+                soma += pa->bloco;
+                pa = pa->proximo;
+            }
+
+            // adiciona o bloco de b, se ainda existir
+            if (pb != NULL) {
+                soma += pb->bloco;
+                pb = pb->proximo;
+            }
+
+            // mantém apenas os quatro últimos dígitos no bloco
+            int bloco = soma % 10000;
+
+            // transporta o excesso para o próximo bloco
+            vai_um = soma / 10000;
+
+            // cria e conecta um nó com o bloco calculado
+            if (!adicionar_bloco(resultado, &ultimo, bloco)) {
+                lista_liberar(resultado);
+                return NULL;
+            }
+        }
+
+    } else {
+        // sinais diferentes: subtrai o menor módulo do maior
+        // exemplo: -10 + 3 = -(10 - 3) = -7
+        int comparacao = comparar_modulos(a, b);
+
+        const Lista *maior;
+        const Lista *menor;
+
+        if (comparacao >= 0) {
+            maior = a;
+            menor = b;
+        } else {
+            maior = b;
+            menor = a;
+        }
+
+        // mantém o sinal do número com maior módulo
+        resultado->sinal = maior->sinal;
+
+        const No *pa = maior->head;
+        const No *pb = menor->head;
+
+        //pegar emprestado para realizar a subtração
+        int emprestimo = 0;
+
+        while (pa != NULL) {
+            // desconta o empréstimo feito pelo bloco anterior
+            int diferenca = pa->bloco - emprestimo;
+
+            // subtrai o bloco correspondente, se existir
+            if (pb != NULL) {
+                diferenca -= pb->bloco;
+                pb = pb->proximo;
+            }
+
+            if (diferenca < 0) {
+                // empresta uma unidade da próxima posição
+                // cada unidade dessa posição equivale a 10000
+                diferenca += 10000;
+                emprestimo = 1;
+            } else {
+                emprestimo = 0;
+            }
+
+            // guarda a diferença em um novo nó
+            if (!adicionar_bloco(resultado, &ultimo, diferenca)) {
+                lista_liberar(resultado);
+                return NULL;
+            }
+
+            pa = pa->proximo;
+        }
+    }
+
+    // remove blocos de zero excedentes na parte mais significativa
+    // se o resultado for zero, deixa apenas um nó e sinal positivo
+    normalizar(resultado);
+
+    return resultado;
 }
