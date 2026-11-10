@@ -22,10 +22,7 @@ int lista_comparar(const Lista *a, const Lista *b);
 /*
  * Imprime somente o numero, sem "Resultado::" e sem quebra de linha.
  *
- * Retorna:
- * 1: impressao realizada;
- * 0: argumento invalido, falha de memoria ou erro de escrita.
- * Imprime o número representado pela lista. */
+ * NÃO RETORNA VALOR */
 
 void lista_imprimir(const Lista *lista);
 
