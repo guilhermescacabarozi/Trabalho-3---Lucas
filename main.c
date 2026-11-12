@@ -11,14 +11,32 @@ int main()
     for(int i = 0; i < n; i++)
     {
         char palavra[6];
+
         scanf("%5s", palavra);
+
         Lista *a = lista_ler();
         Lista *b = lista_ler();
+
+        if (a == NULL || b == NULL)
+        {
+            lista_liberar(a);
+            lista_liberar(b);
+            return 1;
+        }
         printf("Resultado:: ");
 
         if(strcmp(palavra, "soma") == 0)
         {
             Lista *r = lista_somar(a,b);
+
+            if (r == NULL)
+            {
+                lista_liberar(a);
+                lista_liberar(b);
+                return 1;
+            }
+            
+
             lista_imprimir(r);
             lista_liberar(r);
         }
